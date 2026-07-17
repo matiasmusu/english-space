@@ -1,0 +1,3 @@
+'use client'
+import {useStore} from '@/lib/store'
+export default function History(){const {contributions,activities}=useStore();const sorted=[...contributions].sort((a,b)=>b.createdAt.localeCompare(a.createdAt));return <div className="page"><header><div><h1>Historial colaborativo</h1><p>Quién agregó cada respuesta, corrección, comentario o nota.</p></div></header><section className="timeline">{sorted.map(e=><article className={`timeline-entry ${e.kind}`} key={e.id}><div className="entry-head"><strong>{e.author.name}</strong><span>{new Date(e.createdAt).toLocaleString('es-AR')}</span></div><p>{activities.find(a=>a.id===e.activityId)?.title}</p><div className={e.kind==='correction'?'red-ink-text':''}>{e.body}</div></article>)}</section></div>}
