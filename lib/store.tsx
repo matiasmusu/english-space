@@ -43,7 +43,25 @@ export function StoreProvider({children}:{children:React.ReactNode}){
  useEffect(()=>{if(!loading&&!currentUser&&path!='/login')router.replace('/login');if(!loading&&currentUser&&path==='/login')router.replace('/')},[loading,currentUser,path,router])
  const ensure=()=>{if(!currentUser)throw new Error('Debés iniciar sesión')}
  const value=useMemo<Ctx>(()=>({currentUser,loading,error,activities,contributions,materials,notes,refresh,
-  signIn:async(email,password)=>{setLoading(true);const {error}=await supabase.auth.signInWithPassword({email,password});if(error){setLoading(false);throw error}await refresh()},
+  signIn:async(email,password)=>{
+   setLoading(true)
+   setError(null)
+   const {data,error}=await supabase.auth.signInWithPassword({email,password})
+   if(error){setLoading(false);throw error}
+   if(!data.user){setLoading(false);throw new Error('No se pudo iniciar sesión.')}
+
+   // No esperamos refresh() acá: algunas versiones del cliente de Supabase
+   // pueden bloquear llamadas consecutivas durante el cambio de sesión.
+   const metadata=data.user.user_metadata||{}
+   setCurrentUser({
+    id:data.user.id,
+    name:metadata.full_name||data.user.email?.split('@')[0]||'Usuario',
+    role:metadata.role==='teacher'?'teacher':'student'
+   })
+   setLoading(false)
+   router.replace('/')
+   window.setTimeout(()=>{void refresh()},100)
+  },
   signOut:async()=>{await supabase.auth.signOut();setCurrentUser(null);router.replace('/login')},
   addActivity:async v=>{ensure();const {data,error}=await supabase.from('activities').insert({title:v.title,instructions:v.instructions,action_type:v.actionType,status:v.status,due_date:v.dueDate||null,book_reference:v.bookReference||null,material_id:v.materialId||null,created_by:currentUser!.id}).select('id').single();if(error)throw error;if(v.file)await uploadFiles('activity',data.id,[v.file]);await refresh();return data.id},
   updateStatus:async(id,s)=>{const {error}=await supabase.from('activities').update({status:s,updated_at:new Date().toISOString()}).eq('id',id);if(error)throw error;await refresh()},
