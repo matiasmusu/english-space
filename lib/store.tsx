@@ -31,7 +31,15 @@ export function StoreProvider({children}:{children:React.ReactNode}){
   setContributions((contribR.data||[]).map((c:any)=>({id:c.id,activityId:c.activity_id,author:people.get(c.author_id)||me,kind:c.kind,body:c.body,originalText:c.original_text||undefined,createdAt:c.created_at})))
   setNotes((notesR.data||[]).map((n:any)=>({id:n.id,title:n.title,date:n.entry_date||'',topic:n.topic||'',notes:n.notes||'',relatedActivityId:n.related_activity_id||undefined,createdBy:people.get(n.created_by)||me,createdAt:n.created_at,attachments:signed.get(n.id)||[]})));setLoading(false)
  },[supabase])
- useEffect(()=>{refresh();const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>refresh());return()=>subscription.unsubscribe()},[refresh,supabase])
+ useEffect(()=>{
+  void refresh()
+  const {data:{subscription}}=supabase.auth.onAuthStateChange(()=>{
+    // Supabase advierte que no se deben ejecutar otras llamadas del cliente
+    // directamente dentro de este callback porque puede producir un bloqueo.
+    window.setTimeout(()=>{ void refresh() },0)
+  })
+  return()=>subscription.unsubscribe()
+ },[refresh,supabase])
  useEffect(()=>{if(!loading&&!currentUser&&path!='/login')router.replace('/login');if(!loading&&currentUser&&path==='/login')router.replace('/')},[loading,currentUser,path,router])
  const ensure=()=>{if(!currentUser)throw new Error('Debés iniciar sesión')}
  const value=useMemo<Ctx>(()=>({currentUser,loading,error,activities,contributions,materials,notes,refresh,
