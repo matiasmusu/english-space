@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { History as HistoryIcon } from 'lucide-react'
 import { useStore } from '@/lib/store'
+import EmptyState from '@/components/EmptyState'
 import type { EntryKind } from '@/lib/types'
 
 const kindLabels: Record<EntryKind, string> = {
@@ -86,7 +88,7 @@ export default function History() {
           </article>
         ))}
         {!events.length && (
-          <div className="empty"><p>Todavía no hay movimientos. A medida que carguen cosas, van a aparecer acá.</p></div>
+          <EmptyState icon={HistoryIcon} title="Todavía no hay movimientos" hint="A medida que carguen actividades, materiales y aportes, van a aparecer acá." />
         )}
       </section>
     </div>

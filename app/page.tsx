@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { ClipboardList, BookOpen, NotebookTabs } from 'lucide-react'
+import { ClipboardList, BookOpen, NotebookTabs, Clock, TrendingUp, Library } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import StatusBadge from '@/components/StatusBadge'
 
@@ -26,12 +26,12 @@ export default function Home() {
 
   return (
     <div className="page">
-      <header>
+      <section className="hero">
         <div>
           <h1>{greeting()}, {currentUser.name}</h1>
           <p>{todayLabel()}</p>
         </div>
-      </header>
+      </section>
 
       <section className="quick-actions">
         <Link href="/activities?nueva=1"><span className="qa-icon"><ClipboardList size={21} /></span>Crear una actividad</Link>
@@ -40,10 +40,22 @@ export default function Home() {
       </section>
 
       <section className="stats">
-        <article><b>{pending.length}</b><span>Pendientes</span></article>
-        <article><b>{inProgress.length}</b><span>En progreso</span></article>
-        <article><b>{materials.length}</b><span>Materiales</span></article>
-        <article><b>{notes.length}</b><span>Páginas del cuaderno</span></article>
+        <article>
+          <span className="stat-icon amber"><Clock size={19} /></span>
+          <div><b>{pending.length}</b><span>Pendientes</span></div>
+        </article>
+        <article>
+          <span className="stat-icon blue"><TrendingUp size={19} /></span>
+          <div><b>{inProgress.length}</b><span>En progreso</span></div>
+        </article>
+        <article>
+          <span className="stat-icon blue"><Library size={19} /></span>
+          <div><b>{materials.length}</b><span>Materiales</span></div>
+        </article>
+        <article>
+          <span className="stat-icon green"><NotebookTabs size={19} /></span>
+          <div><b>{notes.length}</b><span>Páginas del cuaderno</span></div>
+        </article>
       </section>
 
       <section className="columns">

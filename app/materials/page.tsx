@@ -1,11 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { BookOpen, FileText, Headphones, Image as ImageIcon, Link2, Video, Library } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useStore, friendlyError } from '@/lib/store'
 import AttachmentList from '@/components/AttachmentList'
+import EmptyState from '@/components/EmptyState'
 import type { Material } from '@/lib/types'
 
 const emptyForm = { title: '', description: '', type: 'PDF', category: 'General', url: '', pinned: false }
+
+const typeIcons: Record<string, LucideIcon> = {
+  PDF: FileText,
+  Libro: BookOpen,
+  Documento: FileText,
+  Link: Link2,
+  Video: Video,
+  Audio: Headphones,
+  Imagen: ImageIcon
+}
 
 export default function Materials() {
   const { materials, addMaterial, updateMaterial, deleteMaterial } = useStore()
@@ -75,21 +88,25 @@ export default function Materials() {
   const pinned = materials.filter(x => x.pinned)
   const library = materials.filter(x => !x.pinned)
 
-  const card = (x: Material) => (
-    <article key={x.id}>
-      <div>
-        <h3>{x.title}</h3>
-        <p>{x.type} · {x.category} · por {x.createdBy.name}</p>
-        {x.description && <p>{x.description}</p>}
-        {x.url && <a className="file-chip" href={x.url} target="_blank" rel="noreferrer">🔗 Abrir enlace</a>}
-        <AttachmentList attachments={x.attachments} />
-      </div>
-      <div className="stack-links">
-        <button type="button" className="secondary small-button" onClick={() => startEdit(x)}>Editar</button>
-        <button type="button" className="link-danger" onClick={() => remove(x)}>Eliminar</button>
-      </div>
-    </article>
-  )
+  const card = (x: Material) => {
+    const Icon = typeIcons[x.type] || FileText
+    return (
+      <article key={x.id} className="material-item">
+        <span className="type-tile"><Icon size={22} /></span>
+        <div className="material-body">
+          <h3>{x.title}</h3>
+          <p>{x.type} · {x.category} · por {x.createdBy.name}</p>
+          {x.description && <p>{x.description}</p>}
+          {x.url && <a className="file-chip" href={x.url} target="_blank" rel="noreferrer">🔗 Abrir enlace</a>}
+          <AttachmentList attachments={x.attachments} />
+        </div>
+        <div className="stack-links">
+          <button type="button" className="secondary small-button" onClick={() => startEdit(x)}>Editar</button>
+          <button type="button" className="link-danger" onClick={() => remove(x)}>Eliminar</button>
+        </div>
+      </article>
+    )
+  }
 
   return (
     <div className="page">
@@ -158,10 +175,7 @@ export default function Materials() {
       <section className="list">
         {library.map(card)}
         {!library.length && !pinned.length && (
-          <div className="empty">
-            <p>Todavía no hay materiales.</p>
-            <p>Usá <b>+ Agregar material</b> para subir el primero.</p>
-          </div>
+          <EmptyState icon={Library} title="Todavía no hay materiales" hint="Usá + Agregar material para subir el primero." />
         )}
       </section>
     </div>

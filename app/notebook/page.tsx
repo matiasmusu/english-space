@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { NotebookTabs } from 'lucide-react'
 import { useStore, friendlyError } from '@/lib/store'
 import AttachmentList from '@/components/AttachmentList'
+import EmptyState from '@/components/EmptyState'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -120,10 +122,7 @@ export default function Notebook() {
           )
         })}
         {!notes.length && (
-          <div className="empty">
-            <p>El cuaderno está vacío.</p>
-            <p>Usá <b>+ Nueva entrada</b> para subir fotos o apuntes de una clase.</p>
-          </div>
+          <EmptyState icon={NotebookTabs} title="El cuaderno está vacío" hint="Usá + Nueva entrada para subir fotos o apuntes de una clase." />
         )}
       </section>
     </div>
