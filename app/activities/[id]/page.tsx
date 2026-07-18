@@ -236,7 +236,8 @@ export default function ActivityDetail() {
       </section>
 
       <form className="panel contribution-form form" onSubmit={submitContribution}>
-        <h2>Agregar aporte como {currentUser?.name}</h2>
+        <h2>Agregar aporte</h2>
+        <p>Se guarda en el historial con tu nombre y la fecha.</p>
         <label>Tipo de aporte
           <select value={kind} onChange={e => setKind(e.target.value as EntryKind)}>
             <option value="answer">Respuesta</option>

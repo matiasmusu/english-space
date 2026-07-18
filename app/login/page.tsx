@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { BookOpen, ClipboardList, MessageSquareText, NotebookTabs } from 'lucide-react'
 import { useStore } from '@/lib/store'
 
 export default function Login() {
@@ -47,52 +48,74 @@ export default function Login() {
   const busy = loading || submitting
 
   return (
-    <div className="page narrow">
-      <form className="panel login" onSubmit={submit}>
-        <h1>English Space</h1>
-        <p>Espacio colaborativo de Matías y Romina.</p>
-
-        <div className="auth-tabs">
-          <button type="button" className={mode === 'login' ? '' : 'secondary'} onClick={() => { setMode('login'); setError(''); setMessage('') }}>
-            Ingresar
-          </button>
-          <button type="button" className={mode === 'register' ? '' : 'secondary'} onClick={() => { setMode('register'); setError(''); setMessage('') }}>
-            Crear cuenta
-          </button>
+    <div className="login-screen">
+      <div className="login-hero">
+        <div className="brand-mark"><BookOpen size={26} /></div>
+        <h2>English Space</h2>
+        <p>Un espacio ordenado para las clases: actividades, materiales, correcciones y cuaderno, todo en un mismo lugar.</p>
+        <div className="hero-features">
+          <div><ClipboardList />Actividades con estados y fechas</div>
+          <div><MessageSquareText />Respuestas y correcciones con autor y fecha</div>
+          <div><NotebookTabs />Cuaderno digital con fotos y apuntes</div>
         </div>
+      </div>
 
-        {mode === 'register' && (
-          <>
-            <label>Nombre
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="Matías o Romina" required />
-            </label>
-            <label>Perfil
-              <select value={role} onChange={e => setRole(e.target.value as 'student' | 'teacher')}>
-                <option value="student">Alumno</option>
-                <option value="teacher">Profesora</option>
-              </select>
-            </label>
-          </>
-        )}
+      <div className="login-hero-compact">
+        <div className="brand-mark"><BookOpen size={22} /></div>
+        <strong>English Space</strong>
+      </div>
 
-        <label>Correo
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-        </label>
-        <label>Contraseña
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required />
-        </label>
+      <div className="login-side">
+        <form className="login" onSubmit={submit}>
+          <div>
+            <h1>{mode === 'login' ? 'Ingresar' : 'Crear cuenta'}</h1>
+            <p className="login-lead">
+              {mode === 'login' ? 'Accedé con tu correo y contraseña.' : 'Completá tus datos para sumarte al espacio.'}
+            </p>
+          </div>
 
-        {mode === 'register' && (
-          <label>Código privado del espacio
-            <input type="password" value={accessCode} onChange={e => setAccessCode(e.target.value)} required />
-            <small>Usen el mismo código que configuraste al publicar la web.</small>
+          <div className="auth-tabs">
+            <button type="button" className={mode === 'login' ? '' : 'secondary'} onClick={() => { setMode('login'); setError(''); setMessage('') }}>
+              Ingresar
+            </button>
+            <button type="button" className={mode === 'register' ? '' : 'secondary'} onClick={() => { setMode('register'); setError(''); setMessage('') }}>
+              Crear cuenta
+            </button>
+          </div>
+
+          {mode === 'register' && (
+            <>
+              <label>Nombre
+                <input value={name} onChange={e => setName(e.target.value)} required />
+              </label>
+              <label>Perfil
+                <select value={role} onChange={e => setRole(e.target.value as 'student' | 'teacher')}>
+                  <option value="student">Alumno</option>
+                  <option value="teacher">Profesora</option>
+                </select>
+              </label>
+            </>
+          )}
+
+          <label>Correo
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
           </label>
-        )}
+          <label>Contraseña
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={6} required />
+          </label>
 
-        {error && <p className="form-error">{error}</p>}
-        {message && <p className="form-success">{message}</p>}
-        <button disabled={busy}>{busy ? 'Procesando…' : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}</button>
-      </form>
+          {mode === 'register' && (
+            <label>Código de acceso
+              <input type="password" value={accessCode} onChange={e => setAccessCode(e.target.value)} required />
+              <small>El código compartido que habilita el registro en este espacio.</small>
+            </label>
+          )}
+
+          {error && <p className="form-error">{error}</p>}
+          {message && <p className="form-success">{message}</p>}
+          <button disabled={busy}>{busy ? 'Procesando…' : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}</button>
+        </form>
+      </div>
     </div>
   )
 }

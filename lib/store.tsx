@@ -62,6 +62,7 @@ export function friendlyError(err: unknown): string {
   if (msg.includes('email not confirmed')) return 'Falta confirmar el correo. Avisale a Matías para revisarlo en Supabase.'
   if (msg.includes('bucket not found')) return 'No se encontró el espacio de archivos en Supabase. Hay que crear el bucket "english-space".'
   if (msg.includes('row-level security') || msg.includes('violates row-level')) return 'Supabase rechazó la operación por permisos. Revisá las políticas de seguridad (RLS).'
+  if (msg.includes('permission denied')) return 'La base de datos rechazó la operación por falta de permisos. Hay que ejecutar el script supabase/fix-permissions.sql en el SQL Editor de Supabase.'
   if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network request failed')) return 'No hay conexión con el servidor. Revisá tu internet e intentá de nuevo.'
   if (msg.includes('payload too large') || msg.includes('exceeded the maximum allowed size')) return 'El archivo es demasiado grande para subirlo.'
   if (msg.includes('jwt') || msg.includes('token')) return 'La sesión expiró. Cerrá sesión y volvé a ingresar.'

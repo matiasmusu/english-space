@@ -24,10 +24,10 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <BookOpen size={28} />
+          <div className="brand-mark"><BookOpen size={22} /></div>
           <div>
             <strong>English Space</strong>
-            <span>Espacio compartido</span>
+            <span>Clases de inglés</span>
           </div>
         </div>
         <nav>
