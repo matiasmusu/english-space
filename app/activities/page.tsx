@@ -1,7 +1,9 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { ClipboardList } from 'lucide-react'
 import StatusBadge from '@/components/StatusBadge'
+import EmptyState from '@/components/EmptyState'
 import { useStore, friendlyError } from '@/lib/store'
 
 export default function Activities() {
@@ -109,10 +111,7 @@ export default function Activities() {
           </Link>
         ))}
         {!activities.length && (
-          <div className="empty">
-            <p>Todavía no hay actividades.</p>
-            <p>Usá el botón <b>+ Nueva actividad</b> para crear la primera.</p>
-          </div>
+          <EmptyState icon={ClipboardList} title="Todavía no hay actividades" hint="Usá el botón + Nueva actividad para crear la primera." />
         )}
       </section>
     </div>

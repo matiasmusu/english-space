@@ -59,6 +59,7 @@ export function friendlyError(err: unknown): string {
   const raw = (err as { message?: string })?.message || String(err ?? '')
   const msg = raw.toLowerCase()
   if (msg.includes('invalid login credentials')) return 'El correo o la contraseña no son correctos.'
+  if (msg.includes('signups not allowed')) return 'El registro está cerrado en este espacio.'
   if (msg.includes('email not confirmed')) return 'Falta confirmar el correo. Avisale a Matías para revisarlo en Supabase.'
   if (msg.includes('bucket not found')) return 'No se encontró el espacio de archivos en Supabase. Hay que crear el bucket "english-space".'
   if (msg.includes('row-level security') || msg.includes('violates row-level')) return 'Supabase rechazó la operación por permisos. Revisá las políticas de seguridad (RLS).'
