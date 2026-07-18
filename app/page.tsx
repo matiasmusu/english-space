@@ -11,6 +11,11 @@ function greeting() {
   return 'Buenas noches'
 }
 
+function todayLabel() {
+  const s = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 export default function Home() {
   const { currentUser, activities, materials, notes } = useStore()
   if (!currentUser) return null
@@ -23,15 +28,15 @@ export default function Home() {
     <div className="page">
       <header>
         <div>
-          <h1>{greeting()}, {currentUser.name} 👋</h1>
-          <p>El espacio compartido de las clases de inglés.</p>
+          <h1>{greeting()}, {currentUser.name}</h1>
+          <p>{todayLabel()}</p>
         </div>
       </header>
 
       <section className="quick-actions">
-        <Link href="/activities?nueva=1"><ClipboardList size={22} />Crear una actividad</Link>
-        <Link href="/materials?nuevo=1"><BookOpen size={22} />Subir un material</Link>
-        <Link href="/notebook?nueva=1"><NotebookTabs size={22} />Agregar al cuaderno</Link>
+        <Link href="/activities?nueva=1"><span className="qa-icon"><ClipboardList size={21} /></span>Crear una actividad</Link>
+        <Link href="/materials?nuevo=1"><span className="qa-icon"><BookOpen size={21} /></span>Subir un material</Link>
+        <Link href="/notebook?nueva=1"><span className="qa-icon"><NotebookTabs size={21} /></span>Agregar al cuaderno</Link>
       </section>
 
       <section className="stats">
@@ -51,7 +56,7 @@ export default function Home() {
             </Link>
           ))}
           {!pending.length && !inProgress.length && (
-            <p>No hay tareas pendientes. 🎉</p>
+            <p>No hay tareas pendientes.</p>
           )}
         </article>
         <article className="panel">
@@ -65,15 +70,6 @@ export default function Home() {
           {!latestMaterials.length && <p>Todavía no hay materiales cargados.</p>}
         </article>
       </section>
-
-      <article className="panel">
-        <h2>Cómo funciona este espacio</h2>
-        <p>
-          Los dos pueden hacer todo: crear tareas, subir archivos, responder, corregir en rojo
-          y dejar notas de clase. Cada cosa que se agrega guarda quién la hizo y cuándo,
-          así queda todo ordenado entre clase y clase.
-        </p>
-      </article>
     </div>
   )
 }

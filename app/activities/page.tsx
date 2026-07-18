@@ -49,7 +49,7 @@ export default function Activities() {
       <header>
         <div>
           <h1>Actividades</h1>
-          <p>Tareas, lecturas y prácticas. Cualquiera de los dos puede crear y actualizar.</p>
+          <p>Tareas, lecturas y prácticas de las clases.</p>
         </div>
         <button onClick={() => setOpen(!open)}>{open ? 'Cerrar formulario' : '+ Nueva actividad'}</button>
       </header>

@@ -70,7 +70,7 @@ export default function History() {
       <header>
         <div>
           <h1>Historial</h1>
-          <p>Todo lo que fueron agregando los dos, con autor, fecha y hora.</p>
+          <p>Registro de toda la actividad del espacio, con autor, fecha y hora.</p>
         </div>
       </header>
       <section className="timeline">
