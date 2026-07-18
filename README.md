@@ -2,6 +2,23 @@
 
 Aplicación colaborativa para Matías y Romina. Usa Next.js, Supabase Auth, PostgreSQL y Storage privado. Los datos son compartidos entre ambos dispositivos.
 
+## Si ya tenés la app publicada (actualización)
+
+Esta versión trae un `package-lock.json` limpio generado contra el registro público de npm. Después de actualizar el código en GitHub:
+
+1. En Vercel, ir a **Settings > Build & Development Settings**.
+2. Borrar el override del **Install Command** (`npm install --package-lock=false ...`) y dejar que Vercel use el comando por defecto (`npm ci` / detección automática).
+3. Hacer redeploy.
+
+No hace falta tocar Supabase ni las variables de entorno: el esquema y las claves existentes siguen siendo compatibles.
+
+### Si la subida de archivos falla
+
+Ahora la app muestra el error real en pantalla. Los dos casos más comunes:
+
+- **"No se encontró el espacio de archivos"**: en Supabase, ir a **Storage** y verificar que exista el bucket `english-space` (privado). Si no existe, crearlo con ese nombre exacto.
+- **"Supabase rechazó la operación por permisos"**: las políticas de Storage no se aplicaron. En **Storage > Policies** del bucket `english-space`, crear políticas para usuarios autenticados (`authenticated`) que permitan SELECT, INSERT, UPDATE y DELETE, o volver a ejecutar la parte de `storage.objects` de `supabase/schema.sql`.
+
 ## Puesta en marcha rápida
 
 ### 1. Crear Supabase

@@ -9,6 +9,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Completá todos los campos.' }, { status: 400 })
     }
 
+    if (typeof password !== 'string' || password.length < 6) {
+      return NextResponse.json({ error: 'La contraseña debe tener al menos 6 caracteres.' }, { status: 400 })
+    }
+
     if (accessCode !== process.env.REGISTRATION_CODE) {
       return NextResponse.json({ error: 'El código de acceso no es correcto.' }, { status: 403 })
     }
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
     })
 
     const { error } = await supabase.auth.signUp({
-      email,
+      email: String(email).trim().toLowerCase(),
       password,
       options: {
         data: {
@@ -39,7 +43,10 @@ export async function POST(request: Request) {
     })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      const friendly = error.message.toLowerCase().includes('already registered')
+        ? 'Ese correo ya tiene una cuenta. Probá ingresar directamente.'
+        : error.message
+      return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
     return NextResponse.json({ ok: true })
