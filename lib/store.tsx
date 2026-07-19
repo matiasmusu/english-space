@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import type { Activity, ActivityStatus, Attachment, Contribution, EntryKind, Material, NotebookEntry, Person } from './types'
+import type { Activity, ActivityStatus, Attachment, Contribution, EntryKind, Material, NotebookEntry, Person, VocabularyItem } from './types'
 import { createClient } from './supabase'
 
 const BUCKET = 'english-space'
@@ -24,6 +24,9 @@ export type NewMaterial = {
 export type NewNote = {
   title: string; date: string; topic: string; notes: string
   relatedActivityId?: string; files?: File[]
+}
+export type NewVocab = {
+  term: string; translation: string; pronunciation: string; notes: string; classDate?: string
 }
 
 type Ctx = {
@@ -50,6 +53,10 @@ type Ctx = {
   deleteMaterial: (id: string) => Promise<void>
   addNote: (v: NewNote) => Promise<void>
   deleteNote: (id: string) => Promise<void>
+  vocabulary: VocabularyItem[]
+  addVocab: (v: NewVocab) => Promise<void>
+  updateVocab: (id: string, v: NewVocab) => Promise<void>
+  deleteVocab: (id: string) => Promise<void>
 }
 
 const Store = createContext<Ctx | null>(null)
@@ -86,6 +93,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [notes, setNotes] = useState<NotebookEntry[]>([])
+  const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -146,20 +154,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) {
-      setCurrentUser(null); setActivities([]); setMaterials([]); setContributions([]); setNotes([])
+      setCurrentUser(null); setActivities([]); setMaterials([]); setContributions([]); setNotes([]); setVocabulary([])
       setLoading(false)
       return
     }
 
-    const [profilesR, materialsR, activitiesR, contribR, notesR, attachR] = await Promise.all([
+    const [profilesR, materialsR, activitiesR, contribR, notesR, attachR, vocabR] = await Promise.all([
       supabase.from('profiles').select('*'),
       supabase.from('materials').select('*').order('created_at', { ascending: false }),
       supabase.from('activities').select('*').order('created_at', { ascending: false }),
       supabase.from('contributions').select('*').order('created_at'),
       supabase.from('notebook_entries').select('*').order('entry_date', { ascending: false }),
-      supabase.from('attachments').select('*').order('created_at')
+      supabase.from('attachments').select('*').order('created_at'),
+      supabase.from('vocabulary').select('*').order('class_date', { ascending: false }).order('created_at')
     ])
-    const firstErr = [profilesR, materialsR, activitiesR, contribR, notesR, attachR].find(r => r.error)?.error
+    const firstErr = [profilesR, materialsR, activitiesR, contribR, notesR, attachR, vocabR].find(r => r.error)?.error
     if (firstErr) {
       setError(friendlyError(firstErr))
       setLoading(false)
@@ -222,6 +231,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       createdBy: people.get(n.created_by) || me, createdAt: n.created_at,
       attachments: byEntity.get(n.id) || []
     })))
+    setVocabulary((vocabR.data || []).map((v: any) => ({
+      id: v.id, term: v.term, translation: v.translation || '', pronunciation: v.pronunciation || '',
+      notes: v.notes || '', classDate: v.class_date || undefined,
+      createdBy: people.get(v.created_by) || me, createdAt: v.created_at
+    })))
     setLoading(false)
   }, [supabase])
 
@@ -247,7 +261,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo<Ctx>(() => ({
-    currentUser, loading, error, notice, activities, contributions, materials, notes, refresh, clearNotice,
+    currentUser, loading, error, notice, activities, contributions, materials, notes, vocabulary, refresh, clearNotice,
 
     signIn: async (email, password) => {
       setLoading(true)
@@ -417,8 +431,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (err) throw new Error(friendlyError(err))
       await refresh()
       showNotice({ type: 'success', text: 'Entrada eliminada.' })
+    },
+
+    addVocab: async v => {
+      const user = ensure()
+      const { error: err } = await supabase.from('vocabulary').insert({
+        term: v.term, translation: v.translation || null, pronunciation: v.pronunciation || null,
+        notes: v.notes || null, class_date: v.classDate || null, created_by: user.id
+      })
+      if (err) throw new Error(friendlyError(err))
+      await refresh()
+      showNotice({ type: 'success', text: 'Palabra guardada.' })
+    },
+
+    updateVocab: async (id, v) => {
+      ensure()
+      const { error: err } = await supabase.from('vocabulary').update({
+        term: v.term, translation: v.translation || null, pronunciation: v.pronunciation || null,
+        notes: v.notes || null, class_date: v.classDate || null
+      }).eq('id', id)
+      if (err) throw new Error(friendlyError(err))
+      await refresh()
+      showNotice({ type: 'success', text: 'Palabra actualizada.' })
+    },
+
+    deleteVocab: async id => {
+      ensure()
+      const { error: err } = await supabase.from('vocabulary').delete().eq('id', id)
+      if (err) throw new Error(friendlyError(err))
+      await refresh()
+      showNotice({ type: 'success', text: 'Palabra eliminada.' })
     }
-  }), [currentUser, loading, error, notice, activities, contributions, materials, notes, refresh, clearNotice, supabase, router, uploadFiles, removeAttachmentsFor, showNotice])
+  }), [currentUser, loading, error, notice, activities, contributions, materials, notes, vocabulary, refresh, clearNotice, supabase, router, uploadFiles, removeAttachmentsFor, showNotice])
 
   return <Store.Provider value={value}>{children}</Store.Provider>
 }

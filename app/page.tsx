@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { ClipboardList, BookOpen, NotebookTabs, Clock, TrendingUp, Library } from 'lucide-react'
+import { ClipboardList, BookOpen, Languages, Clock, TrendingUp, Library } from 'lucide-react'
 import { useStore } from '@/lib/store'
 import StatusBadge from '@/components/StatusBadge'
 
@@ -17,7 +17,7 @@ function todayLabel() {
 }
 
 export default function Home() {
-  const { currentUser, activities, materials, notes } = useStore()
+  const { currentUser, activities, materials, vocabulary } = useStore()
   if (!currentUser) return null
 
   const pending = activities.filter(a => a.status === 'pending')
@@ -36,7 +36,7 @@ export default function Home() {
       <section className="quick-actions">
         <Link href="/activities?nueva=1"><span className="qa-icon"><ClipboardList size={21} /></span>Crear una actividad</Link>
         <Link href="/materials?nuevo=1"><span className="qa-icon"><BookOpen size={21} /></span>Subir un material</Link>
-        <Link href="/notebook?nueva=1"><span className="qa-icon"><NotebookTabs size={21} /></span>Agregar al cuaderno</Link>
+        <Link href="/vocabulary?nueva=1"><span className="qa-icon"><Languages size={21} /></span>Agregar vocabulario</Link>
       </section>
 
       <section className="stats">
@@ -53,8 +53,8 @@ export default function Home() {
           <div><b>{materials.length}</b><span>Materiales</span></div>
         </article>
         <article>
-          <span className="stat-icon green"><NotebookTabs size={19} /></span>
-          <div><b>{notes.length}</b><span>Páginas del cuaderno</span></div>
+          <span className="stat-icon green"><Languages size={19} /></span>
+          <div><b>{vocabulary.length}</b><span>Palabras de vocabulario</span></div>
         </article>
       </section>
 

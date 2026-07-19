@@ -54,6 +54,17 @@ export interface Material {
   attachments: Attachment[]
 }
 
+export interface VocabularyItem {
+  id: string
+  term: string
+  translation: string
+  pronunciation: string
+  notes: string
+  classDate?: string
+  createdBy: Person
+  createdAt: string
+}
+
 export interface NotebookEntry {
   id: string
   title: string
