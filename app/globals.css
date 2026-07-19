@@ -408,6 +408,36 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .stack-links { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .stack-links a { font-weight: 600; font-size: 14.5px; }
 
+/* ---------- Vocabulario ---------- */
+
+.vocab-search { margin-bottom: 22px; display: flex; align-items: center; gap: 12px; }
+.vocab-search input {
+  font: inherit; width: 100%; max-width: 440px;
+  border: 1px solid #D1D5DB; border-radius: 10px;
+  padding: 12px 14px; min-height: 48px; background: var(--surface);
+}
+.vocab-search input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-border); }
+.vocab-search small { color: var(--text-soft); white-space: nowrap; }
+
+.vocab-group { margin-bottom: 26px; }
+.vocab-group h2 small { color: var(--text-soft); font-weight: 500; font-size: 13.5px; }
+.vocab-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.vocab-item { padding: 13px 18px; border-bottom: 1px solid #F3F4F6; }
+.vocab-item:last-child { border-bottom: 0; }
+.vocab-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.vocab-main strong { font-size: 16px; }
+.vocab-pron { color: var(--primary-dark); font-size: 14px; }
+.vocab-trans { color: var(--text-soft); font-size: 15px; }
+.vocab-trans::before { content: '— '; }
+.vocab-item p { font-size: 14px; margin: 3px 0 0; }
+.vocab-actions { display: flex; gap: 4px; margin-top: 2px; }
+
 /* ---------- Avisos globales ---------- */
 
 .error-banner {

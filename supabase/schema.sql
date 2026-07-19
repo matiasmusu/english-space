@@ -43,6 +43,13 @@ create table public.notebook_entries (
   created_by uuid not null references public.profiles(id), created_at timestamptz not null default now()
 );
 
+-- Vocabulario de las clases: palabra, traducción y pronunciación.
+create table public.vocabulary (
+  id uuid primary key default gen_random_uuid(), term text not null,
+  translation text, pronunciation text, notes text, class_date date,
+  created_by uuid not null references public.profiles(id), created_at timestamptz not null default now()
+);
+
 create table public.attachments (
   id uuid primary key default gen_random_uuid(), entity_type text not null check (entity_type in ('material','activity','contribution','notebook')),
   entity_id uuid not null, file_path text not null, file_name text not null,
@@ -55,6 +62,7 @@ alter table public.activities enable row level security;
 alter table public.contributions enable row level security;
 alter table public.notebook_entries enable row level security;
 alter table public.attachments enable row level security;
+alter table public.vocabulary enable row level security;
 
 -- Espacio privado y colaborativo: ambos usuarios autenticados tienen los mismos permisos sobre contenido.
 create policy "profiles readable" on public.profiles for select to authenticated using (true);
@@ -64,6 +72,7 @@ create policy "activities collaborative" on public.activities for all to authent
 create policy "contributions collaborative" on public.contributions for all to authenticated using (true) with check (true);
 create policy "notebook collaborative" on public.notebook_entries for all to authenticated using (true) with check (true);
 create policy "attachments collaborative" on public.attachments for all to authenticated using (true) with check (true);
+create policy "vocabulary collaborative" on public.vocabulary for all to authenticated using (true) with check (true);
 
 insert into storage.buckets (id,name,public) values ('english-space','english-space',false)
 on conflict (id) do nothing;
