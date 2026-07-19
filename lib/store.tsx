@@ -1,7 +1,7 @@
 'use client'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import type { Activity, ActivityStatus, Attachment, Contribution, EntryKind, Material, NotebookEntry, Person, VocabularyItem } from './types'
+import type { Activity, ActivityStatus, Attachment, Contribution, EntryKind, Material, Person, VocabularyItem } from './types'
 import { createClient } from './supabase'
 
 const BUCKET = 'english-space'
@@ -21,10 +21,6 @@ export type NewMaterial = {
   title: string; description: string; type: string; category: string
   url?: string; pinned: boolean; files?: File[]
 }
-export type NewNote = {
-  title: string; date: string; topic: string; notes: string
-  relatedActivityId?: string; files?: File[]
-}
 export type NewVocab = {
   term: string; translation: string; pronunciation: string; notes: string; classDate?: string
 }
@@ -37,7 +33,6 @@ type Ctx = {
   activities: Activity[]
   contributions: Contribution[]
   materials: Material[]
-  notes: NotebookEntry[]
   clearNotice: () => void
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -47,12 +42,11 @@ type Ctx = {
   deleteActivity: (id: string) => Promise<void>
   updateStatus: (id: string, s: ActivityStatus) => Promise<void>
   addContribution: (activityId: string, kind: EntryKind, body: string, originalText?: string, files?: File[]) => Promise<void>
+  addAnchoredCorrection: (activityId: string, parentId: string, anchorStart: number, anchorEnd: number, originalText: string, correctedText: string) => Promise<void>
   deleteContribution: (id: string) => Promise<void>
   addMaterial: (v: NewMaterial) => Promise<void>
   updateMaterial: (id: string, v: NewMaterial) => Promise<void>
   deleteMaterial: (id: string) => Promise<void>
-  addNote: (v: NewNote) => Promise<void>
-  deleteNote: (id: string) => Promise<void>
   vocabulary: VocabularyItem[]
   addVocab: (v: NewVocab) => Promise<void>
   updateVocab: (id: string, v: NewVocab) => Promise<void>
@@ -92,7 +86,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>([])
   const [contributions, setContributions] = useState<Contribution[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
-  const [notes, setNotes] = useState<NotebookEntry[]>([])
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -154,21 +147,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) {
-      setCurrentUser(null); setActivities([]); setMaterials([]); setContributions([]); setNotes([]); setVocabulary([])
+      setCurrentUser(null); setActivities([]); setMaterials([]); setContributions([]); setVocabulary([])
       setLoading(false)
       return
     }
 
-    const [profilesR, materialsR, activitiesR, contribR, notesR, attachR, vocabR] = await Promise.all([
+    const [profilesR, materialsR, activitiesR, contribR, attachR, vocabR] = await Promise.all([
       supabase.from('profiles').select('*'),
       supabase.from('materials').select('*').order('created_at', { ascending: false }),
       supabase.from('activities').select('*').order('created_at', { ascending: false }),
       supabase.from('contributions').select('*').order('created_at'),
-      supabase.from('notebook_entries').select('*').order('entry_date', { ascending: false }),
       supabase.from('attachments').select('*').order('created_at'),
       supabase.from('vocabulary').select('*').order('class_date', { ascending: false }).order('created_at')
     ])
-    const firstErr = [profilesR, materialsR, activitiesR, contribR, notesR, attachR, vocabR].find(r => r.error)?.error
+    const firstErr = [profilesR, materialsR, activitiesR, contribR, attachR, vocabR].find(r => r.error)?.error
     if (firstErr) {
       setError(friendlyError(firstErr))
       setLoading(false)
@@ -222,14 +214,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })))
     setContributions((contribR.data || []).map((c: any) => ({
       id: c.id, activityId: c.activity_id, author: people.get(c.author_id) || me,
-      kind: c.kind, body: c.body, originalText: c.original_text || undefined, createdAt: c.created_at,
+      kind: c.kind, body: c.body, originalText: c.original_text || undefined,
+      parentId: c.parent_id || undefined,
+      anchorStart: c.anchor_start ?? undefined, anchorEnd: c.anchor_end ?? undefined,
+      createdAt: c.created_at,
       attachments: byEntity.get(c.id) || []
-    })))
-    setNotes((notesR.data || []).map((n: any) => ({
-      id: n.id, title: n.title, date: n.entry_date || '', topic: n.topic || '', notes: n.notes || '',
-      relatedActivityId: n.related_activity_id || undefined,
-      createdBy: people.get(n.created_by) || me, createdAt: n.created_at,
-      attachments: byEntity.get(n.id) || []
     })))
     setVocabulary((vocabR.data || []).map((v: any) => ({
       id: v.id, term: v.term, translation: v.translation || '', pronunciation: v.pronunciation || '',
@@ -261,7 +250,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
 
   const value = useMemo<Ctx>(() => ({
-    currentUser, loading, error, notice, activities, contributions, materials, notes, vocabulary, refresh, clearNotice,
+    currentUser, loading, error, notice, activities, contributions, materials, vocabulary, refresh, clearNotice,
 
     signIn: async (email, password) => {
       setLoading(true)
@@ -355,6 +344,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       showNotice({ type: 'success', text: 'Aporte guardado en el historial.' })
     },
 
+    addAnchoredCorrection: async (activityId, parentId, anchorStart, anchorEnd, originalText, correctedText) => {
+      const user = ensure()
+      const { error: err } = await supabase.from('contributions').insert({
+        activity_id: activityId, author_id: user.id, kind: 'correction',
+        parent_id: parentId, anchor_start: anchorStart, anchor_end: anchorEnd,
+        original_text: originalText, body: correctedText
+      })
+      if (err) throw new Error(friendlyError(err))
+      await refresh()
+      showNotice({ type: 'success', text: 'Corrección guardada.' })
+    },
+
     deleteContribution: async id => {
       ensure()
       await removeAttachmentsFor([id])
@@ -407,32 +408,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       showNotice({ type: 'success', text: 'Material eliminado.' })
     },
 
-    addNote: async v => {
-      const user = ensure()
-      const { data, error: err } = await supabase.from('notebook_entries').insert({
-        title: v.title, entry_date: v.date, topic: v.topic, notes: v.notes,
-        related_activity_id: v.relatedActivityId || null, created_by: user.id
-      }).select('id').single()
-      if (err) throw new Error(friendlyError(err))
-      try {
-        if (v.files?.length) await uploadFiles('notebook', data.id, v.files)
-      } catch (e) {
-        throw new Error(`La entrada se creó, pero falló la subida de las fotos: ${friendlyError(e)}`)
-      } finally {
-        await refresh()
-      }
-      showNotice({ type: 'success', text: 'Entrada guardada en el cuaderno.' })
-    },
-
-    deleteNote: async id => {
-      ensure()
-      await removeAttachmentsFor([id])
-      const { error: err } = await supabase.from('notebook_entries').delete().eq('id', id)
-      if (err) throw new Error(friendlyError(err))
-      await refresh()
-      showNotice({ type: 'success', text: 'Entrada eliminada.' })
-    },
-
     addVocab: async v => {
       const user = ensure()
       const { error: err } = await supabase.from('vocabulary').insert({
@@ -462,7 +437,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       await refresh()
       showNotice({ type: 'success', text: 'Palabra eliminada.' })
     }
-  }), [currentUser, loading, error, notice, activities, contributions, materials, notes, vocabulary, refresh, clearNotice, supabase, router, uploadFiles, removeAttachmentsFor, showNotice])
+  }), [currentUser, loading, error, notice, activities, contributions, materials, vocabulary, refresh, clearNotice, supabase, router, uploadFiles, removeAttachmentsFor, showNotice])
 
   return <Store.Provider value={value}>{children}</Store.Provider>
 }
