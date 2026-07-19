@@ -270,12 +270,20 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   margin-bottom: 2px;
 }
 
-/* Materiales con ficha de tipo */
+/* Materiales con portada o ficha de tipo */
 .material-item { align-items: flex-start !important; }
 .type-tile {
   width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
   background: var(--primary-soft); color: var(--primary-dark);
   display: grid; place-items: center;
+}
+.type-tile.big { width: 64px; height: 86px; border-radius: 10px; }
+.type-tile.yt { background: var(--red-soft); color: #DC2626; }
+.type-tile.gc { background: var(--green-soft); color: var(--green); }
+.material-cover {
+  width: 64px; height: 86px; object-fit: cover; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
 }
 .material-body { flex: 1; min-width: 0; }
 

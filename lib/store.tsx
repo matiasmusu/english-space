@@ -19,7 +19,7 @@ export type ActivityEdit = {
 }
 export type NewMaterial = {
   title: string; description: string; type: string; category: string
-  url?: string; pinned: boolean; files?: File[]
+  url?: string; pinned: boolean; files?: File[]; cover?: File | null
 }
 export type NewVocab = {
   term: string; translation: string; pronunciation: string; notes: string; classDate?: string
@@ -129,6 +129,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   }, [supabase])
 
+  const uploadCover = useCallback(async (materialId: string, cover: File) => {
+    const ext = (cover.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+    const coverPath = `cover/${materialId}/cover-${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(coverPath, cover, {
+      contentType: cover.type || undefined, upsert: true
+    })
+    if (upErr) throw upErr
+    const { error: updErr } = await supabase.from('materials').update({ cover_path: coverPath }).eq('id', materialId)
+    if (updErr) throw updErr
+  }, [supabase])
+
   // Borra los archivos de Storage y las filas de attachments de una o más entidades.
   const removeAttachmentsFor = useCallback(async (entityIds: string[]) => {
     if (!entityIds.length) return
@@ -176,13 +187,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     setCurrentUser(me)
 
-    // Firma todas las URLs de archivos en una sola llamada.
+    // Firma todas las URLs (archivos + portadas) en una sola llamada.
     const attachRows = attachR.data || []
+    const coverPaths = (materialsR.data || []).map((m: any) => m.cover_path).filter(Boolean)
     const byEntity = new Map<string, Attachment[]>()
-    if (attachRows.length) {
-      const paths = attachRows.map((a: any) => a.file_path)
-      const { data: signedList } = await supabase.storage.from(BUCKET).createSignedUrls(paths, SIGNED_URL_SECONDS)
-      const urlByPath = new Map<string, string>()
+    const urlByPath = new Map<string, string>()
+    const allPaths = [...attachRows.map((a: any) => a.file_path), ...coverPaths]
+    if (allPaths.length) {
+      const { data: signedList } = await supabase.storage.from(BUCKET).createSignedUrls(allPaths, SIGNED_URL_SECONDS)
       for (const s of signedList || []) {
         if (s.signedUrl && s.path) urlByPath.set(s.path, s.signedUrl)
       }
@@ -200,6 +212,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setMaterials((materialsR.data || []).map((m: any) => ({
       id: m.id, title: m.title, description: m.description || '', type: m.type,
       category: m.category || 'General', url: m.external_url || undefined, pinned: m.is_pinned,
+      coverPath: m.cover_path || undefined,
+      coverUrl: m.cover_path ? urlByPath.get(m.cover_path) : undefined,
       createdBy: people.get(m.created_by) || me, createdAt: m.created_at,
       attachments: byEntity.get(m.id) || []
     })))
@@ -227,6 +241,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })))
     setLoading(false)
   }, [supabase])
+
+  // Sincronización en vivo: cuando la otra persona cambia algo, se actualiza solo.
+  // Si el canal en vivo no puede conectarse (redes que bloquean WebSockets),
+  // se cae a un sondeo suave cada 20 segundos.
+  useEffect(() => {
+    if (!currentUser) return
+    let debounce: number | null = null
+    let live = false
+    const channel = supabase
+      .channel('cambios-en-vivo')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
+        if (debounce) window.clearTimeout(debounce)
+        debounce = window.setTimeout(() => { void refresh() }, 500)
+      })
+      .subscribe((status: string) => { live = status === 'SUBSCRIBED' })
+    const poll = window.setInterval(() => {
+      if (!live && document.visibilityState === 'visible') void refresh()
+    }, 20000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      if (debounce) window.clearTimeout(debounce)
+      window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+      void supabase.removeChannel(channel)
+    }
+  }, [currentUser?.id, supabase, refresh])
 
   useEffect(() => {
     void refresh()
@@ -374,6 +415,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (err) throw new Error(friendlyError(err))
       try {
         if (v.files?.length) await uploadFiles('material', data.id, v.files)
+        if (v.cover) await uploadCover(data.id, v.cover)
       } catch (e) {
         throw new Error(`El material se creó, pero falló la subida del archivo: ${friendlyError(e)}`)
       } finally {
@@ -391,6 +433,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (err) throw new Error(friendlyError(err))
       try {
         if (v.files?.length) await uploadFiles('material', id, v.files)
+        if (v.cover) await uploadCover(id, v.cover)
       } catch (e) {
         throw new Error(`El material se actualizó, pero falló la subida del archivo: ${friendlyError(e)}`)
       } finally {
@@ -402,6 +445,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     deleteMaterial: async id => {
       ensure()
       await removeAttachmentsFor([id])
+      const coverPath = materials.find(m => m.id === id)?.coverPath
+      if (coverPath) await supabase.storage.from(BUCKET).remove([coverPath])
       const { error: err } = await supabase.from('materials').delete().eq('id', id)
       if (err) throw new Error(friendlyError(err))
       await refresh()
@@ -437,7 +482,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       await refresh()
       showNotice({ type: 'success', text: 'Palabra eliminada.' })
     }
-  }), [currentUser, loading, error, notice, activities, contributions, materials, vocabulary, refresh, clearNotice, supabase, router, uploadFiles, removeAttachmentsFor, showNotice])
+  }), [currentUser, loading, error, notice, activities, contributions, materials, vocabulary, refresh, clearNotice, supabase, router, uploadFiles, uploadCover, removeAttachmentsFor, showNotice])
 
   return <Store.Provider value={value}>{children}</Store.Provider>
 }

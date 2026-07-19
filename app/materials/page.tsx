@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BookOpen, FileText, Headphones, Image as ImageIcon, Link2, Video, Library } from 'lucide-react'
+import { BookOpen, FileText, GraduationCap, Headphones, Image as ImageIcon, Link2, Video, Library, Youtube, BookMarked } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore, friendlyError } from '@/lib/store'
 import AttachmentList from '@/components/AttachmentList'
@@ -20,6 +20,18 @@ const typeIcons: Record<string, LucideIcon> = {
   Imagen: ImageIcon
 }
 
+// Portada del material: imagen si tiene, si no un icono según el servicio o el tipo.
+function MaterialCover({ m }: { m: Material }) {
+  if (m.coverUrl) return <img className="material-cover" src={m.coverUrl} alt={`Portada de ${m.title}`} />
+  const url = (m.url || '').toLowerCase()
+  let Icon = typeIcons[m.type] || FileText
+  let brand = ''
+  if (url.includes('youtube.com') || url.includes('youtu.be')) { Icon = Youtube; brand = ' yt' }
+  else if (url.includes('classroom.google')) { Icon = GraduationCap; brand = ' gc' }
+  else if (url.includes('wordreference') || url.includes('cambridge')) { Icon = BookMarked; brand = '' }
+  return <span className={`type-tile big${brand}`}><Icon size={30} /></span>
+}
+
 export default function Materials() {
   const { materials, addMaterial, updateMaterial, deleteMaterial } = useStore()
   const [open, setOpen] = useState(false)
@@ -29,6 +41,7 @@ export default function Materials() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [files, setFiles] = useState<File[]>([])
+  const [cover, setCover] = useState<File | null>(null)
 
   useEffect(() => {
     if (window.location.search.includes('nuevo=1')) setOpen(true)
@@ -42,6 +55,7 @@ export default function Materials() {
     setForm({ title: m.title, description: m.description, type: m.type, category: m.category, url: m.url || '', pinned: m.pinned })
     setEditingId(m.id)
     setFiles([])
+    setCover(null)
     setFormError('')
     setOpen(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -52,6 +66,7 @@ export default function Materials() {
     setEditingId(null)
     setForm(emptyForm)
     setFiles([])
+    setCover(null)
     setFormError('')
   }
 
@@ -61,7 +76,7 @@ export default function Materials() {
     setSaving(true)
     setFormError('')
     try {
-      const values = { ...form, title: form.title.trim(), url: form.url || undefined, files }
+      const values = { ...form, title: form.title.trim(), url: form.url || undefined, files, cover }
       if (editingId) {
         await updateMaterial(editingId, values)
       } else {
@@ -89,10 +104,9 @@ export default function Materials() {
   const library = materials.filter(x => !x.pinned)
 
   const card = (x: Material) => {
-    const Icon = typeIcons[x.type] || FileText
     return (
       <article key={x.id} className="material-item">
-        <span className="type-tile"><Icon size={22} /></span>
+        <MaterialCover m={x} />
         <div className="material-body">
           <h3>{x.title}</h3>
           <p>{x.type} · {x.category} · por {x.createdBy.name}</p>
@@ -151,6 +165,10 @@ export default function Materials() {
           <label>{editingId ? 'Agregar archivos (opcional)' : 'Archivos (opcional)'}
             <input type="file" multiple onChange={e => setFiles(Array.from(e.target.files || []))} />
             {files.length > 0 && <small>{files.length} archivo{files.length > 1 ? 's' : ''} para subir</small>}
+          </label>
+          <label>Portada (opcional)
+            <input type="file" accept="image/*" onChange={e => setCover(e.target.files?.[0] || null)} />
+            <small>Una imagen de la tapa del libro o del recurso, para reconocerlo de un vistazo.</small>
           </label>
           <label className="checkbox">
             <input type="checkbox" checked={form.pinned} onChange={e => set('pinned', e.target.checked)} />

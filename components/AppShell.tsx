@@ -1,15 +1,14 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BookOpen, ClipboardList, Home, Languages, History, LogOut } from 'lucide-react'
+import { BookOpen, ClipboardList, Home, Languages, LogOut } from 'lucide-react'
 import { StoreProvider, useStore } from '@/lib/store'
 
 const items = [
   ['/', 'Inicio', Home],
   ['/activities', 'Actividades', ClipboardList],
   ['/vocabulary', 'Vocabulario', Languages],
-  ['/materials', 'Materiales', BookOpen],
-  ['/history', 'Historial', History]
+  ['/materials', 'Materiales', BookOpen]
 ] as const
 
 function Shell({ children }: { children: React.ReactNode }) {
