@@ -25,7 +25,7 @@ type Event = {
 }
 
 export default function History() {
-  const { contributions, activities, materials, notes } = useStore()
+  const { contributions, activities, materials } = useStore()
 
   const events: Event[] = [
     ...contributions.map(c => ({
@@ -34,7 +34,7 @@ export default function History() {
       author: c.author.name,
       label: kindLabels[c.kind],
       cssKind: c.kind,
-      text: c.body,
+      text: c.kind === 'correction' && c.originalText ? `"${c.originalText}" → ${c.body}` : c.body,
       href: `/activities/${c.activityId}`,
       isCorrection: c.kind === 'correction'
     })),
@@ -55,15 +55,6 @@ export default function History() {
       cssKind: 'comment',
       text: m.title,
       href: '/materials'
-    })),
-    ...notes.map(n => ({
-      id: `n-${n.id}`,
-      when: n.createdAt,
-      author: n.createdBy.name,
-      label: 'Entrada de cuaderno',
-      cssKind: 'class_note',
-      text: n.title,
-      href: '/notebook'
     }))
   ].sort((a, b) => b.when.localeCompare(a.when))
 

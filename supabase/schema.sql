@@ -34,7 +34,10 @@ create table public.contributions (
   id uuid primary key default gen_random_uuid(), activity_id uuid not null references public.activities(id) on delete cascade,
   author_id uuid not null references public.profiles(id), kind public.contribution_kind not null,
   original_text text, body text not null, created_at timestamptz not null default now(),
-  edited_at timestamptz
+  edited_at timestamptz,
+  -- Corrección anclada: apunta a un fragmento [anchor_start, anchor_end) del aporte padre.
+  parent_id uuid references public.contributions(id) on delete cascade,
+  anchor_start int, anchor_end int
 );
 
 create table public.notebook_entries (

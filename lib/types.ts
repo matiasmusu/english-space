@@ -22,6 +22,10 @@ export interface Contribution {
   kind: EntryKind
   body: string
   originalText?: string
+  // Corrección anclada: apunta a un fragmento [anchorStart, anchorEnd) del aporte padre.
+  parentId?: string
+  anchorStart?: number
+  anchorEnd?: number
   createdAt: string
   attachments: Attachment[]
 }

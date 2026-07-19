@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useStore, friendlyError } from '@/lib/store'
 import StatusBadge from '@/components/StatusBadge'
 import AttachmentList from '@/components/AttachmentList'
-import type { EntryKind, ActivityStatus } from '@/lib/types'
+import type { Contribution, EntryKind, ActivityStatus } from '@/lib/types'
 
 const kindLabels: Record<EntryKind, string> = {
   answer: 'Respuesta',
@@ -22,17 +22,35 @@ const statusOptions: { value: ActivityStatus; label: string }[] = [
   { value: 'reviewed', label: 'Revisada' }
 ]
 
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+
+// Posición de un punto (nodo + offset) dentro del texto plano del contenedor,
+// ignorando el contenido de los popovers de corrección.
+function textOffset(container: HTMLElement, node: Node, offset: number): number {
+  let total = 0
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  while ((n = walker.nextNode())) {
+    if ((n.parentElement)?.closest('.ink-pop, .correct-float')) continue
+    if (n === node) return total + offset
+    total += n.textContent?.length || 0
+  }
+  return total
+}
+
+type Sel = { entryId: string; start: number; end: number; text: string; top: number; left: number }
+
 export default function ActivityDetail() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const {
     activities, materials, contributions, currentUser, loading,
-    addContribution, deleteContribution, updateStatus, updateActivity, deleteActivity
+    addContribution, addAnchoredCorrection, deleteContribution, updateStatus, updateActivity, deleteActivity
   } = useStore()
   const activity = activities.find(a => a.id === id)
 
   const [kind, setKind] = useState<EntryKind>('answer')
-  const [original, setOriginal] = useState('')
   const [body, setBody] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
@@ -43,6 +61,13 @@ export default function ActivityDetail() {
   const [editSaving, setEditSaving] = useState(false)
   const [editValues, setEditValues] = useState({ title: '', instructions: '', actionType: '', dueDate: '', bookReference: '', materialId: '' })
 
+  // Corrección inline
+  const [sel, setSel] = useState<Sel | null>(null)
+  const [correcting, setCorrecting] = useState(false)
+  const [correctionText, setCorrectionText] = useState('')
+  const [savingCorr, setSavingCorr] = useState(false)
+  const [openCorr, setOpenCorr] = useState<string | null>(null)
+
   if (!activity) {
     return (
       <div className="page">
@@ -51,7 +76,12 @@ export default function ActivityDetail() {
       </div>
     )
   }
-  const entries = contributions.filter(c => c.activityId === id)
+
+  const all = contributions.filter(c => c.activityId === id)
+  const entries = all.filter(c => !c.parentId)
+  const childrenOf = (pid: string) =>
+    all.filter(c => c.parentId === pid && c.anchorStart != null && c.anchorEnd != null)
+      .sort((a, b) => a.anchorStart! - b.anchorStart!)
 
   function startEditing() {
     setEditValues({
@@ -115,8 +145,8 @@ export default function ActivityDetail() {
     setSaving(true)
     setFormError('')
     try {
-      await addContribution(id, kind, body, original || undefined, files)
-      setBody(''); setOriginal(''); setFiles([]); setKind('answer')
+      await addContribution(id, kind, body, undefined, files)
+      setBody(''); setFiles([]); setKind('answer')
     } catch (err) {
       setFormError(friendlyError(err))
     } finally {
@@ -124,9 +154,10 @@ export default function ActivityDetail() {
     }
   }
 
-  async function removeContribution(cid: string) {
-    if (!window.confirm('¿Eliminar este aporte del historial?')) return
+  async function removeContribution(cid: string, what: string) {
+    if (!window.confirm(`¿Eliminar ${what}?`)) return
     setPageError('')
+    setOpenCorr(null)
     try {
       await deleteContribution(cid)
     } catch (err) {
@@ -134,8 +165,84 @@ export default function ActivityDetail() {
     }
   }
 
+  // ---- Selección de texto para corregir ----
+  function handleSelect(entry: Contribution, e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) {
+    if (correcting) return
+    const container = e.currentTarget
+    const s = window.getSelection()
+    if (!s || s.isCollapsed || !s.rangeCount) { setSel(null); return }
+    const range = s.getRangeAt(0)
+    if (!container.contains(range.startContainer) || !container.contains(range.endContainer)) { setSel(null); return }
+    const start = textOffset(container, range.startContainer, range.startOffset)
+    const end = textOffset(container, range.endContainer, range.endOffset)
+    if (end <= start) { setSel(null); return }
+    // No permitir superponer una corrección existente
+    if (childrenOf(entry.id).some(k => k.anchorStart! < end && start < k.anchorEnd!)) { setSel(null); return }
+    const rect = range.getBoundingClientRect()
+    const crect = container.getBoundingClientRect()
+    setSel({
+      entryId: entry.id, start, end,
+      text: entry.body.slice(start, end),
+      top: rect.bottom - crect.top + 6,
+      left: Math.max(0, Math.min(rect.left - crect.left, crect.width - 260))
+    })
+    setCorrecting(false)
+    setCorrectionText('')
+  }
+
+  async function saveCorrection() {
+    if (!sel || !correctionText.trim()) return
+    setSavingCorr(true)
+    setPageError('')
+    try {
+      await addAnchoredCorrection(id, sel.entryId, sel.start, sel.end, sel.text, correctionText.trim())
+      setSel(null)
+      setCorrecting(false)
+      setCorrectionText('')
+      window.getSelection()?.removeAllRanges()
+    } catch (err) {
+      setPageError(friendlyError(err))
+    } finally {
+      setSavingCorr(false)
+    }
+  }
+
+  // Cuerpo de un aporte con las correcciones ancladas marcadas en rojo.
+  function annotated(entry: Contribution) {
+    const kids = childrenOf(entry.id)
+    const text = entry.body
+    if (!kids.length) return text
+    const parts: React.ReactNode[] = []
+    let pos = 0
+    for (const k of kids) {
+      const s = Math.max(pos, Math.min(k.anchorStart!, text.length))
+      const e = Math.max(s, Math.min(k.anchorEnd!, text.length))
+      if (s > pos) parts.push(text.slice(pos, s))
+      parts.push(
+        <mark
+          key={k.id}
+          className="ink"
+          title={`Corrección: ${k.body}`}
+          onClick={ev => { ev.stopPropagation(); setSel(null); setOpenCorr(openCorr === k.id ? null : k.id) }}
+        >
+          {text.slice(s, e)}
+          {openCorr === k.id && (
+            <span className="ink-pop" onClick={ev => ev.stopPropagation()}>
+              <span className="ink-pop-body">{k.body}</span>
+              <span className="ink-pop-meta">Corrección de {k.author.name} · {fmtDate(k.createdAt)}</span>
+              <button type="button" className="link-danger" onClick={() => removeContribution(k.id, 'esta corrección')}>Eliminar corrección</button>
+            </span>
+          )}
+        </mark>
+      )
+      pos = e
+    }
+    parts.push(text.slice(pos))
+    return parts
+  }
+
   return (
-    <div className="page">
+    <div className="page" onClick={() => setOpenCorr(null)}>
       <header>
         <div>
           <h1>{activity.title}</h1>
@@ -214,20 +321,51 @@ export default function ActivityDetail() {
 
       <section className="timeline">
         <h2>Trabajo e historial</h2>
+        <p className="correct-hint">Para corregir: seleccioná el texto en una respuesta y tocá <b>Corregir</b>. Lo corregido queda en rojo; al tocarlo se ve la corrección.</p>
         {entries.map(entry => (
           <article className={`timeline-entry ${entry.kind}`} key={entry.id}>
             <div className="entry-head">
               <span className="entry-kind">{kindLabels[entry.kind]}</span>
-              <span>{entry.author.name} · {new Date(entry.createdAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+              <span>{entry.author.name} · {fmtDate(entry.createdAt)}</span>
             </div>
-            {entry.originalText && <div className="original"><b>Original:</b> {entry.originalText}</div>}
-            <div className={entry.kind === 'correction' ? 'red-ink-text' : ''}>{entry.body}</div>
-            <AttachmentList attachments={entry.attachments} />
-            {entry.author.id === currentUser?.id && (
-              <div className="entry-actions">
-                <button type="button" className="link-danger" onClick={() => removeContribution(entry.id)}>Eliminar</button>
-              </div>
+            {entry.kind === 'correction' && entry.originalText && (
+              <div className="original"><b>Original:</b> {entry.originalText}</div>
             )}
+            <div
+              className={`entry-body${entry.kind === 'correction' ? ' red-ink-text' : ''}`}
+              onMouseUp={entry.kind !== 'correction' ? e => handleSelect(entry, e) : undefined}
+              onTouchEnd={entry.kind !== 'correction' ? e => handleSelect(entry, e) : undefined}
+            >
+              {annotated(entry)}
+              {sel?.entryId === entry.id && (
+                <span className="correct-float" style={{ top: sel.top, left: sel.left }} onClick={e => e.stopPropagation()}>
+                  {!correcting ? (
+                    <button type="button" className="correct-btn" onClick={() => setCorrecting(true)}>✏️ Corregir</button>
+                  ) : (
+                    <span className="correct-form">
+                      <span className="correct-orig">“{sel.text.length > 70 ? sel.text.slice(0, 70) + '…' : sel.text}”</span>
+                      <input
+                        autoFocus
+                        value={correctionText}
+                        onChange={e => setCorrectionText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void saveCorrection() } }}
+                        placeholder="Texto correcto o explicación"
+                      />
+                      <span className="correct-form-actions">
+                        <button type="button" className="small-button" disabled={savingCorr} onClick={() => void saveCorrection()}>
+                          {savingCorr ? 'Guardando…' : 'Guardar'}
+                        </button>
+                        <button type="button" className="secondary small-button" onClick={() => { setSel(null); setCorrecting(false) }}>Cancelar</button>
+                      </span>
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+            <AttachmentList attachments={entry.attachments} />
+            <div className="entry-actions">
+              <button type="button" className="link-danger" onClick={() => removeContribution(entry.id, 'este aporte del historial')}>Eliminar</button>
+            </div>
           </article>
         ))}
         {!entries.length && (
@@ -241,18 +379,12 @@ export default function ActivityDetail() {
         <label>Tipo de aporte
           <select value={kind} onChange={e => setKind(e.target.value as EntryKind)}>
             <option value="answer">Respuesta</option>
-            <option value="correction">Corrección</option>
             <option value="comment">Comentario</option>
             <option value="class_note">Nota de clase</option>
           </select>
         </label>
-        {kind === 'correction' && (
-          <label>Texto original
-            <textarea value={original} onChange={e => setOriginal(e.target.value)} placeholder="La frase o respuesta que se está corrigiendo" />
-          </label>
-        )}
-        <label>{kind === 'correction' ? 'Texto corregido y explicación' : 'Contenido'}
-          <textarea className={kind === 'correction' ? 'red-ink' : ''} value={body} onChange={e => setBody(e.target.value)} required />
+        <label>Contenido
+          <textarea value={body} onChange={e => setBody(e.target.value)} required />
         </label>
         <label>Archivos (opcional)
           <input type="file" multiple onChange={e => setFiles(Array.from(e.target.files || []))} />
