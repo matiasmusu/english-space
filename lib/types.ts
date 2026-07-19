@@ -53,6 +53,8 @@ export interface Material {
   category: string
   url?: string
   pinned: boolean
+  coverPath?: string
+  coverUrl?: string
   createdBy: Person
   createdAt: string
   attachments: Attachment[]

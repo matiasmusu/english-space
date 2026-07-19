@@ -16,7 +16,8 @@ create table public.profiles (
 create table public.materials (
   id uuid primary key default gen_random_uuid(), title text not null, description text,
   type text not null default 'document', category text, file_path text, external_url text,
-  is_pinned boolean not null default false, created_by uuid not null references public.profiles(id),
+  is_pinned boolean not null default false, cover_path text,
+  created_by uuid not null references public.profiles(id),
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
@@ -98,6 +99,13 @@ begin
   return new;
 end;
 $$;
+
+-- Sincronización en vivo entre los dos usuarios.
+alter publication supabase_realtime add table public.activities;
+alter publication supabase_realtime add table public.contributions;
+alter publication supabase_realtime add table public.materials;
+alter publication supabase_realtime add table public.vocabulary;
+alter publication supabase_realtime add table public.attachments;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
